@@ -42,7 +42,7 @@ typedef struct s_player{
 	float height;
 	int turn_direction;// -1 for left +1 for right
 	int walk_direction;// -1 for back +1 fot front
-	float roatarion_angle;
+	float rotation_angle;
 	float walk_speed;
 	float turn_speed;
 }	t_player;
@@ -72,9 +72,9 @@ void setup(t_data *img)
 	img->p.height = 5;
 	img->p.turn_direction = 0;
 	img->p.walk_direction = 0;
-	img->p.roatarion_angle = M_PI / 2;
-	img->p.walk_speed = 100;
-	img->p.turn_speed = (45 * (M_PI / 180));
+	img->p.rotation_angle = M_PI / 2;
+	img->p.walk_speed = 10;
+	img->p.turn_speed = (1 * (M_PI / 180));
 
 }
 
@@ -82,6 +82,7 @@ void            draw_pixel(t_data *data, int x, int y, int color)
 {
     char    *dst;
 
+	// printf("x = %d\n y= %d\n", x, y);
     dst = data->addr + (y * data->line_length + x * (data->bits_per_pixel / 8));
     *(unsigned int*)dst = color;
 }
@@ -106,6 +107,19 @@ int initializeWindow(t_data *data){
 
 	return (TRUE);
 }
+void move_player(t_data *img)
+{
+	img->p.rotation_angle += img->p.turn_direction * img->p.turn_speed;
+
+	float move_step = img->p.walk_direction * img->p.walk_speed;
+
+	float new_player_x = img->p.x + cos(img->p.rotation_angle) * move_step;
+	float new_player_y = img->p.y + sin(img->p.rotation_angle) * move_step;
+
+	img->p.x = new_player_x;
+	img->p.y = new_player_y;
+
+}
 
 void destroyWindow(t_data *data){
 	mlx_destroy_window(data->vars.mlx, data->vars.win);
@@ -120,8 +134,38 @@ int key_pressed(int keycode, t_data *data){
 		destroyWindow(data);
 		return (0);
 	}
+	if (keycode == 1) // S
+		data->p.walk_direction = -1;
+	if (keycode == 13) // W
+		data->p.walk_direction = 1;
+	// if (keycode == 0) // A
+	// 	data->p.lr_direction = -1;
+	// if (keycode == 2) // D
+	// 	data->p.lr_direction = 1;
+	if (keycode == 123) // <-
+		data->p.turn_direction = -1;
+	if (keycode == 124) // ->
+		data->p.turn_direction = 1;
 	return (1);
 }
+
+int key_released(int keycode, t_data *data)
+{
+	if (keycode == 1) // S
+		data->p.walk_direction = 0;
+	if (keycode == 13) // W
+		data->p.walk_direction = 0;
+	// if (keycode == 0) // A
+	// 	data->p.lr_direction = 0;
+	// if (keycode == 2) // D
+	// 	data->p.lr_direction = 0;
+	if (keycode == 123) // <-
+		data->p.turn_direction = 0;
+	if (keycode == 124) // ->
+		data->p.turn_direction = 0;
+	return (1);
+}
+
 void clear_map(t_data *img){
 	int i;
 	int j;
@@ -136,9 +180,12 @@ void clear_map(t_data *img){
 		i++;
 	}
 }
-void update()
+
+
+
+void update(t_data *img)
 {
-	// remember to update game object as a function of deltaTime
+	move_player(img);
 }
 
 void draw_square(t_data *img, int x, int y, int size, int color)
@@ -174,14 +221,42 @@ void render_map(t_data *img)
     }
 }
 
+void draw_line(t_data *data, int x0, int y0, int x1, int y1)
+{
+	double dx;
+	double dy;
+	double len;
+	int i;
+
+	dx = x1 - x0;
+	dy = y1 - y0;
+	len = (fabs(dx) >= fabs(dy)) ? fabs(dx) : fabs(dy);
+	dx /= len;
+	dy /= len;
+	i = 0;
+	while (i < (int)len)
+	{
+		draw_pixel(data, x0 + (int)(dx * i), y0 + (int)(dy * i), 0xff0000);
+		i++;
+	}
+}
+
+
+void render_player(t_data *img)
+{
+	float x = img->p.x * MINIMAP_SCALE_FACTOR, y = img->p.y * MINIMAP_SCALE_FACTOR;
+	draw_square(img, (int)y, (int)x, 1, 0xFFFFFF);
+	draw_line(img, x, y, x + 40 * cos(img->p.rotation_angle), y + 40 * sin(img->p.rotation_angle));
+}
+
 int render(t_data *img){
 	// draw_pixel(img , WINDOW_WIDTH, WINDOW_HEIGHT, 255);
 	clear_map(img);//draw window black
-	update();
+	update(img);
 	//render game objects here
 	render_map(img);
 	// render_rays();
-	// render_player();
+	render_player(img);
 
 	// draw_square(img);
 	mlx_put_image_to_window(img->vars.mlx, img->vars.win, img->img, 0, 0);//putimage
@@ -200,6 +275,8 @@ int main (int argc, char **argv){
 
 	// render(&img);
 	mlx_hook(img.vars.win, 2, 1L<<0, &key_pressed, &img);
+	mlx_hook(img.vars.win, 3, 1L<<1, &key_released, &img);
 	mlx_loop_hook(img.vars.mlx, render, &img);
+
     mlx_loop(img.vars.mlx);
 }
