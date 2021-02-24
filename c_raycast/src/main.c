@@ -1,14 +1,51 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include "./../minilibx/mlx.h"
 
 #define FALSE 0
 #define TRUE 1
-#define WINDOW_WIDTH 800
-#define WINDOW_HEIGHT 600
+#define WINDOW_WIDTH (MAP_NUM_COLS * TILE_SIZE)
+#define WINDOW_HEIGHT (MAP_NUM_ROWS * TILE_SIZE)
+#define TILE_SIZE 64
+#define MAP_NUM_ROWS 13
+#define MAP_NUM_COLS 20
+
+#define MINIMAP_SCALE_FACTOR 0.3
+
+#define FOV_ANGLE (60 * (M_PI / 180))
+
+#define NUM_RAYS WINDOW_WIDTH
 
 // int isGameRunning = FALSE;
-int playerx, playery;
+
+const int map[MAP_NUM_ROWS][MAP_NUM_COLS] = {
+    {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 ,1, 1, 1, 1, 1, 1, 1},
+    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+    {1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1},
+    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1},
+    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1},
+    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1},
+    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1},
+    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+    {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}
+};
+
+typedef struct s_player{
+	float x;
+	float y;
+	float width;
+	float height;
+	int turn_direction;// -1 for left +1 for right
+	int walk_direction;// -1 for back +1 fot front
+	float roatarion_angle;
+	float walk_speed;
+	float turn_speed;
+}	t_player;
 
 
 typedef struct  s_vars {
@@ -20,16 +57,25 @@ typedef struct  s_data {
     void        *img;
     char        *addr;
 	t_vars		vars;
+	t_player	p;
     int         bits_per_pixel;
     int         line_length;
     int         endian;
 }               t_data;
 
 
-void setup()
+void setup(t_data *img)
 {
-	playerx = 0;
-	playery = 0;
+	img->p.x = WINDOW_WIDTH / 2;
+	img->p.y = WINDOW_HEIGHT / 2;
+	img->p.width = 5;
+	img->p.height = 5;
+	img->p.turn_direction = 0;
+	img->p.walk_direction = 0;
+	img->p.roatarion_angle = M_PI / 2;
+	img->p.walk_speed = 100;
+	img->p.turn_speed = (45 * (M_PI / 180));
+
 }
 
 void            draw_pixel(t_data *data, int x, int y, int color)
@@ -68,8 +114,9 @@ void destroyWindow(t_data *data){
 
 int key_pressed(int keycode, t_data *data){
 	printf("keycode = %d\n",keycode);
-	
-	if (keycode == 65307){
+
+	if (keycode == 53)//65307
+	{
 		destroyWindow(data);
 		return (0);
 	}
@@ -80,9 +127,9 @@ void clear_map(t_data *img){
 	int j;
 
 	i = 0;
-	while(i < 200){
+	while(i < WINDOW_HEIGHT){
 		j = 0;
-		while (j < 300){
+		while (j < WINDOW_WIDTH){
 			draw_pixel(img, j, i, 0);
 			j++;
 		}
@@ -91,22 +138,23 @@ void clear_map(t_data *img){
 }
 void update()
 {
-	playerx += 1;
-	playery += 1;
+	// remember to update game object as a function of deltaTime
 }
 
-void draw_square(t_data *img)
+void draw_square(t_data *img, int x, int y, int size, int color)
 {
 	int i;
 	int j;
 
 	i = 0;
-	while (i < 20)
+	while (i < size)
 	{
 		j = 0;
-		while(j < 20)
+		while(j < size)
 		{
-			draw_pixel(img, j + playery , i + playerx , 0xFF0000);
+			// if (playerx + i >= 300 || playery + j >= 300)
+				// break ;
+			draw_pixel(img, j + y, i + x, color);
 			j++;
 		}
 		i++;
@@ -114,11 +162,28 @@ void draw_square(t_data *img)
 
 }
 
+void render_map(t_data *img)
+{
+	for (int i = 0; i < MAP_NUM_ROWS; i++) {
+        for (int j = 0; j < MAP_NUM_COLS; j++) {
+        	int tile_x = i * TILE_SIZE;
+            int tile_y = j * TILE_SIZE;
+            int tile_color = map[i][j] == 1 ? 0xFFFFFF : 0x00;
+			draw_square(img, tile_x * MINIMAP_SCALE_FACTOR, tile_y * MINIMAP_SCALE_FACTOR, TILE_SIZE * MINIMAP_SCALE_FACTOR, tile_color);
+        }
+    }
+}
+
 int render(t_data *img){
 	// draw_pixel(img , WINDOW_WIDTH, WINDOW_HEIGHT, 255);
 	clear_map(img);//draw window black
 	update();
-	draw_square(img);
+	//render game objects here
+	render_map(img);
+	// render_rays();
+	// render_player();
+
+	// draw_square(img);
 	mlx_put_image_to_window(img->vars.mlx, img->vars.win, img->img, 0, 0);//putimage
 	//TODO:
 	//render all game objects for the current frame
@@ -131,10 +196,10 @@ int main (int argc, char **argv){
     if(!initializeWindow(&img))
 		exit(0);
 
-	setup();
+	setup(&img);
 
 	// render(&img);
 	mlx_hook(img.vars.win, 2, 1L<<0, &key_pressed, &img);
-	mlx_loop_hook(img.vars.win, render, &img);
+	mlx_loop_hook(img.vars.mlx, render, &img);
     mlx_loop(img.vars.mlx);
 }
