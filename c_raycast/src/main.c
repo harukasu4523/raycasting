@@ -83,13 +83,13 @@ void setup(t_data *img)
 {
 	img->p.x = WINDOW_WIDTH / 2;
 	img->p.y = WINDOW_HEIGHT / 2;
-	img->p.width = 5;
-	img->p.height = 5;
+	img->p.width = 1;
+	img->p.height = 1;
 	img->p.turn_direction = 0;
 	img->p.walk_direction = 0;
-	img->p.rotation_angle = M_PI / 2;
+	img->p.rotation_angle = M_PI / 2.0;
 	img->p.walk_speed = 1;
-	img->p.turn_speed = (1 * (M_PI / 180));
+	img->p.turn_speed = (1.0 * (M_PI / 180));
 
 }
 
@@ -154,42 +154,92 @@ void destroyWindow(t_data *data){
 	exit(0);
 }
 
+
+/////////////////////////
+//linux keycode
+////////////////////////
+
+// int key_pressed(int keycode, t_data *data){
+// 	printf("keycode = %d\n",keycode);
+
+// 	if (keycode == 65307)//53
+// 	{
+// 		destroyWindow(data);
+// 		return (0);
+// 	}
+// 	if (keycode == 115)//1) // S
+// 		data->p.walk_direction = -1;
+// 	if (keycode == 119)//13) // W
+// 		data->p.walk_direction = 1;
+// 	// if (keycode == 0) // A
+// 	// 	data->p.lr_direction = -1;
+// 	// if (keycode == 2) // D
+// 	// 	data->p.lr_direction = 1;
+// 	if (keycode == 65361)//123) // <-
+// 		data->p.turn_direction = -1;
+// 	if (keycode == 65363)//124) // ->
+// 		data->p.turn_direction = 1;
+// 	return (1);
+// }
+
+// int key_released(int keycode, t_data *data)
+// {
+// 	if (keycode == 115)//1) // S
+// 		data->p.walk_direction = 0;
+// 	if (keycode == 119)//13) // W
+// 		data->p.walk_direction = 0;
+// 	// if (keycode == 0) // A
+// 	// 	data->p.lr_direction = 0;
+// 	// if (keycode == 2) // D
+// 	// 	data->p.lr_direction = 0;
+// 	if (keycode == 65361)//123) // <-
+// 		data->p.turn_direction = 0;
+// 	if (keycode == 65363)//124) // ->
+// 		data->p.turn_direction = 0;
+// 	return (1);
+// }
+
+//////////////////////
+//mac keycode
+//////////////////////
+
+
 int key_pressed(int keycode, t_data *data){
 	printf("keycode = %d\n",keycode);
 
-	if (keycode == 65307)//53
+	if (keycode == 53)//esc
 	{
 		destroyWindow(data);
 		return (0);
 	}
-	if (keycode == 115)//1) // S
+	if (keycode == 1) // S
 		data->p.walk_direction = -1;
-	if (keycode == 119)//13) // W
+	if (keycode == 13) // W
 		data->p.walk_direction = 1;
 	// if (keycode == 0) // A
 	// 	data->p.lr_direction = -1;
 	// if (keycode == 2) // D
 	// 	data->p.lr_direction = 1;
-	if (keycode == 65361)//123) // <-
+	if (keycode == 123) // <-
 		data->p.turn_direction = -1;
-	if (keycode == 65363)//124) // ->
+	if (keycode == 124) // ->
 		data->p.turn_direction = 1;
 	return (1);
 }
 
 int key_released(int keycode, t_data *data)
 {
-	if (keycode == 115)//1) // S
+	if (keycode == 1) // S
 		data->p.walk_direction = 0;
-	if (keycode == 119)//13) // W
+	if (keycode == 13) // W
 		data->p.walk_direction = 0;
 	// if (keycode == 0) // A
 	// 	data->p.lr_direction = 0;
 	// if (keycode == 2) // D
 	// 	data->p.lr_direction = 0;
-	if (keycode == 65361)//123) // <-
+	if (keycode == 123) // <-
 		data->p.turn_direction = 0;
-	if (keycode == 65363)//124) // ->
+	if (keycode == 124) // ->
 		data->p.turn_direction = 0;
 	return (1);
 }
@@ -229,8 +279,8 @@ void cast_ray(float ray_angle, int strip_id, t_data *img)
 
 	int face_down = ray_angle > 0 && ray_angle < M_PI;
 	int face_up = !face_down;
-	
-	int face_right = ray_angle > 0.5 * M_PI || ray_angle > 1.5 * M_PI;
+
+	int face_right = ray_angle < 0.5 * M_PI || ray_angle > 1.5 * M_PI;
 	int face_left = !face_right;
 
 	float xintercept, yintercept;
@@ -295,13 +345,13 @@ void cast_ray(float ray_angle, int strip_id, t_data *img)
 	xintercept += face_right ? TILE_SIZE : 0;
 
 	// Find the x-coordinate of the closest horizontal grid intersection
-	yintercept = img->p.x + (xintercept - img->p.x) / tan(ray_angle);
+	yintercept = img->p.y + (xintercept - img->p.x) * tan(ray_angle);
 
 	// Calculate the increment xstep and ystep
 	xstep = TILE_SIZE;
 	xstep *= face_left ? -1 : 1;
 
-	ystep = TILE_SIZE / tan(ray_angle);
+	ystep = TILE_SIZE * tan(ray_angle);
 	ystep *= (face_up && ystep > 0) ? -1 : 1;
 	ystep *= (face_down && ystep < 0) ? -1 : 1;
 
@@ -310,7 +360,7 @@ void cast_ray(float ray_angle, int strip_id, t_data *img)
 
 	// Increment xstep and ystep until we find a wall
 	while (next_vert_touch_x >= 0 && next_vert_touch_x <= WINDOW_WIDTH && next_vert_touch_y >= 0 && next_vert_touch_y <= WINDOW_HEIGHT) {
-		float x_to_check = next_vert_touch_x + (face_up ? -1 : 0);
+		float x_to_check = next_vert_touch_x + (face_left ? -1 : 0);
 		float y_to_check = next_vert_touch_y;
 
 		if (map_has_wall_at(x_to_check, y_to_check)) {
@@ -402,7 +452,7 @@ void render_map(t_data *img)
     }
 }
 
-void draw_line(t_data *data, float x0, float y0, float x1, float y1)
+void draw_line(t_data *data, float x0, float y0, float x1, float y1, int color)
 {
 	double dx;
 	double dy;
@@ -417,7 +467,7 @@ void draw_line(t_data *data, float x0, float y0, float x1, float y1)
 	i = 0;
 	while (i < (int)len)
 	{
-		draw_pixel(data, x0 + (int)(dx * i), y0 + (int)(dy * i), 0xff0000);
+		draw_pixel(data, x0 + (int)(dx * i), y0 + (int)(dy * i), color);
 		i++;
 	}
 }
@@ -427,7 +477,7 @@ void render_rays(t_data *img)
 	int color = 0xFF0000;
 	for (int i = 0; i < NUM_RAYS; i++)
 	{
-		draw_line(img, MINIMAP_SCALE_FACTOR * img->p.x,MINIMAP_SCALE_FACTOR * img->p.y, MINIMAP_SCALE_FACTOR * img->ray[i].wall_hit_x , MINIMAP_SCALE_FACTOR * img->ray[i].wall_hit_y);
+		draw_line(img, MINIMAP_SCALE_FACTOR * img->p.x,MINIMAP_SCALE_FACTOR * img->p.y, MINIMAP_SCALE_FACTOR * img->ray[i].wall_hit_x , MINIMAP_SCALE_FACTOR * img->ray[i].wall_hit_y, color);
 	}
 }
 
@@ -436,7 +486,7 @@ void render_player(t_data *img)
 {
 	float x = img->p.x * MINIMAP_SCALE_FACTOR, y = img->p.y * MINIMAP_SCALE_FACTOR;
 	draw_square(img, (int)y, (int)x, 1, 0xFFFFFF);
-	draw_line(img, x, y, x + 40 * cos(img->p.rotation_angle), y + 40 * sin(img->p.rotation_angle));
+	draw_line(img, x, y, x + 40 * cos(img->p.rotation_angle), y + 40 * sin(img->p.rotation_angle), 0x0000FF);
 }
 
 int render(t_data *img){
