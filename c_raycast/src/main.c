@@ -12,6 +12,17 @@
 #define MAP_NUM_ROWS 13
 #define MAP_NUM_COLS 20
 
+
+#define TEX_WIDTH 64
+#define TEX_HEIGHT 64
+
+
+uint32_t* walltexture = NULL;
+
+
+
+
+
 #define MINIMAP_SCALE_FACTOR 0.3
 
 #define FOV_ANGLE (60 * (M_PI / 180))
@@ -69,15 +80,20 @@ typedef struct  s_vars {
 
 typedef struct  s_data {
     void        *img;
+	void		*ptr;
     char        *addr;
+	int 		*data;
 	t_vars		vars;
 	t_player	p;
 	t_ray		ray;
+	int			width;
+	int			height;
     int         bits_per_pixel;
     int         line_length;
     int         endian;
 }               t_data;
 
+// uint32_t* colorbuffer = NULL;
 
 void setup(t_data *img)
 {
@@ -91,6 +107,17 @@ void setup(t_data *img)
 	img->p.walk_speed = 1;
 	img->p.turn_speed = (1.0 * (M_PI / 180));
 
+	img->data = (int *)malloc(sizeof(int) * WINDOW_WIDTH * WINDOW_HEIGHT);
+
+	walltexture = (uint32_t*)malloc(sizeof(uint32_t) * TEX_WIDTH * TEX_HEIGHT);
+	// create a texture with a pattern of blue or black
+	for(int x = 0; x < TEX_WIDTH; x++)
+	{
+		for(int y = 0; y < TEX_HEIGHT; y++)
+		{
+			walltexture[TEX_WIDTH * y + x] = (x % 8 && y % 8) ?  0x0000ff : 0x000000;
+		}
+	}
 }
 
 void            draw_pixel(t_data *data, int x, int y, int color)
@@ -446,7 +473,7 @@ void render_map(t_data *img)
         for (int j = 0; j < MAP_NUM_COLS; j++) {
         	int tile_x = i * TILE_SIZE;
             int tile_y = j * TILE_SIZE;
-            int tile_color = map[i][j] == 1 ? 0xFFFFFF : 0x00;
+            int tile_color = map[i][j] == 1 ? 0xFFFFFF : 0x333333;
 			draw_square(img, tile_x * MINIMAP_SCALE_FACTOR, tile_y * MINIMAP_SCALE_FACTOR, TILE_SIZE * MINIMAP_SCALE_FACTOR, tile_color);
         }
     }
@@ -489,17 +516,105 @@ void render_player(t_data *img)
 	draw_line(img, x, y, x + 40 * cos(img->p.rotation_angle), y + 40 * sin(img->p.rotation_angle), 0x0000FF);
 }
 
+void clear_color_buffer(t_data *img)
+{
+	img->data = (int *)mlx_get_data_addr(img->img, &(img->bits_per_pixel), &(img->line_length), &(img->endian));
+	for(int x = 0; x < WINDOW_WIDTH; x++)
+	{
+		for(int y = 0 ; y < WINDOW_HEIGHT; y++)
+		{
+			img->data[(WINDOW_WIDTH * y) + x] = 0x000000;
+		}
+	}
+	// mlx_put_image_to_window(img->vars.mlx, img->vars.win, img->img, 0, 0);//putimage
+}
+
+void render_color_bufer(t_data *img)
+{
+	// img->data = (int *)mlx_get_data_addr(img->img, &(img->bits_per_pixel), &(img->line_length), &(img->endian));
+	for(int x = 0; x < WINDOW_WIDTH; x++)
+	{
+		for(int y = 0 ; y < WINDOW_HEIGHT; y++)
+		{
+			img->data[(WINDOW_WIDTH * y) + x] = 0x000000;
+		}
+	}
+}
+
+void generate3d_projection(t_data *img)
+{
+	// img->ptr = mlx_xpm_file_to_image(img->vars.mlx, "../wall_s.xpm", &img->width, &img->height);
+
+	// img->data = (int *)mlx_get_data_addr(img->img, &(img->bits_per_pixel), &(img->line_length), &(img->endian));
+
+	for(int i = 0; i < NUM_RAYS; i++)
+	{
+		float prep_distance = img->ray[i].distance * cos(img->ray[i].ray_angle - img->p.rotation_angle);
+		float distance_proj_plane = (WINDOW_WIDTH / 2) / tan(FOV_ANGLE / 2);
+		float projected_wall_height = (TILE_SIZE / prep_distance) * distance_proj_plane;
+
+		int wall_strip_height = (int)projected_wall_height;
+		int wall_top_pixel = (WINDOW_HEIGHT / 2) - (wall_strip_height / 2);
+		wall_top_pixel = wall_top_pixel < 0 ? 0 : wall_top_pixel;
+
+		int wall_bottom_pixel = (WINDOW_HEIGHT / 2) + (wall_strip_height / 2);
+		wall_bottom_pixel = wall_bottom_pixel > WINDOW_HEIGHT ? WINDOW_HEIGHT : wall_bottom_pixel;
+
+		int texture_offset_x;
+		// set the color of the ceiling
+		for (int y = 0; y < wall_top_pixel; y++)
+		{
+			img->data[(WINDOW_WIDTH * y) + i] = 0x333333;
+		}
+		//TODO calculate texture offset_x
+		if (img->ray[i].was_hit_vertical)
+		{
+			//perform offset for the vertical
+			texture_offset_x = (int)img->ray[i].wall_hit_y % TILE_SIZE;
+		}else
+		{
+			//perform offser for the horizontal
+			texture_offset_x = (int)img->ray[i].wall_hit_x % TILE_SIZE;
+		}
+
+		for (int y = wall_top_pixel ; y < wall_bottom_pixel; y++)
+		{
+			//TODO calculate texture offset_y
+			int distance_from_top = y + (wall_strip_height / 2) - (WINDOW_HEIGHT / 2)
+			int texture_offset_y = distance_from_top * ((float)TEX_HEIGHT / wall_strip_height);
+			//set the color of the wall based on the color from the texture
+			uint32_t texture_color = walltexture [(TEX_WIDTH * texture_offset_y) + texture_offset_x];
+			img->data[(WINDOW_WIDTH * y) + i] = texture_color;
+		}
+		//set the color of the floor
+		for (int y = wall_bottom_pixel; y < WINDOW_HEIGHT ; y++)
+		{
+			img->data[(WINDOW_WIDTH * y) + i] = 0x777777;
+		}
+
+	}
+	// mlx_put_image_to_window(img->vars.mlx, img->vars.win, img->ptr, 0, 0);//putimage
+
+}
+
 int render(t_data *img){
 	// draw_pixel(img , WINDOW_WIDTH, WINDOW_HEIGHT, 255);
 	clear_map(img);//draw window black
 	update(img);
-	//render game objects here
+
+	clear_color_buffer(img);
+	render_color_bufer(img);
+	generate3d_projection(img);
+	//clear the color buffer
+
+	//display  the minimap
 	render_map(img);
 	render_rays(img);
 	render_player(img);
 
 	// draw_square(img);
 	mlx_put_image_to_window(img->vars.mlx, img->vars.win, img->img, 0, 0);//putimage
+
 	//TODO:
 	//render all game objects for the current frame
 	return (0);
@@ -520,133 +635,3 @@ int main (int argc, char **argv){
 
     mlx_loop(img.vars.mlx);
 }
-
-
-
-// void castRay(float rayAngle, int stripId) {
-// 	rayAngle = normalizeAngle(rayAngle);
-
-// 	int isRayFacingDown = rayAngle > 0 && rayAngle < PI;
-// 	int isRayFacingUp = !isRayFacingDown;
-
-// 	int isRayFacingRight = rayAngle < 0.5 * PI || rayAngle > 1.5 * PI;
-// 	int isRayFacingLeft = !isRayFacingRight;
-
-// 	float xintercept, yintercept;
-// 	float xstep, ystep;
-
-// 	///////////////////////////////////////////
-// 	// HORIZONTAL RAY-GRID INTERSECTION CODE
-// 	///////////////////////////////////////////
-// 	int foundHorzWallHit = FALSE;
-// 	float horzWallHitX = 0;
-// 	float horzWallHitY = 0;
-// 	int horzWallContent = 0;
-
-// 	// Find the y-coordinate of the closest horizontal grid intersection
-// 	yintercept = floor(player.y / TILE_SIZE) * TILE_SIZE;
-// 	yintercept += isRayFacingDown ? TILE_SIZE : 0;
-
-// 	// Find the x-coordinate of the closest horizontal grid intersection
-// 	xintercept = player.x + (yintercept - player.y) / tan(rayAngle);
-
-// 	// Calculate the increment xstep and ystep
-// 	ystep = TILE_SIZE;
-// 	ystep *= isRayFacingUp ? -1 : 1;
-
-// 	xstep = TILE_SIZE / tan(rayAngle);
-// 	xstep *= (isRayFacingLeft && xstep > 0) ? -1 : 1;
-// 	xstep *= (isRayFacingRight && xstep < 0) ? -1 : 1;
-
-// 	float nextHorzTouchX = xintercept;
-// 	float nextHorzTouchY = yintercept;
-
-// 	// Increment xstep and ystep until we find a wall
-// 	while (nextHorzTouchX >= 0 && nextHorzTouchX <= WINDOW_WIDTH && nextHorzTouchY >= 0 && nextHorzTouchY <= WINDOW_HEIGHT) {
-// 		float xToCheck = nextHorzTouchX;
-// 		float yToCheck = nextHorzTouchY + (isRayFacingUp ? -1 : 0);
-
-// 		if (mapHasWallAt(xToCheck, yToCheck)) {
-// 			// found a wall hit
-// 			horzWallHitX = nextHorzTouchX;
-// 			horzWallHitY = nextHorzTouchY;
-// 			horzWallContent = map[(int)floor(yToCheck / TILE_SIZE)][(int)floor(xToCheck / TILE_SIZE)];
-// 			foundHorzWallHit = TRUE;
-// 			break;
-// 		} else {
-// 			nextHorzTouchX += xstep;
-// 			nextHorzTouchY += ystep;
-// 		}
-// 	}
-
-// 	///////////////////////////////////////////
-// 	// VERTICAL RAY-GRID INTERSECTION CODE
-// 	///////////////////////////////////////////
-// 	int foundVertWallHit = FALSE;
-// 	float vertWallHitX = 0;
-// 	float vertWallHitY = 0;
-// 	int vertWallContent = 0;
-
-// 	// Find the x-coordinate of the closest horizontal grid intersection
-// 	xintercept = floor(player.x / TILE_SIZE) * TILE_SIZE;
-// 	xintercept += isRayFacingRight ? TILE_SIZE : 0;
-
-// 	// Find the y-coordinate of the closest horizontal grid intersection
-// 	yintercept = player.y + (xintercept - player.x) * tan(rayAngle);
-
-// 	// Calculate the increment xstep and ystep
-// 	xstep = TILE_SIZE;
-// 	xstep *= isRayFacingLeft ? -1 : 1;
-
-// 	ystep = TILE_SIZE * tan(rayAngle);
-// 	ystep *= (isRayFacingUp && ystep > 0) ? -1 : 1;
-// 	ystep *= (isRayFacingDown && ystep < 0) ? -1 : 1;
-
-// 	float nextVertTouchX = xintercept;
-// 	float nextVertTouchY = yintercept;
-
-// 	// Increment xstep and ystep until we find a wall
-// 	while (nextVertTouchX >= 0 && nextVertTouchX <= WINDOW_WIDTH && nextVertTouchY >= 0 && nextVertTouchY <= WINDOW_HEIGHT) {
-// 		float xToCheck = nextVertTouchX + (isRayFacingLeft ? -1 : 0);
-// 		float yToCheck = nextVertTouchY;
-
-// 		if (mapHasWallAt(xToCheck, yToCheck)) {
-// 			// found a wall hit
-// 			vertWallHitX = nextVertTouchX;
-// 			vertWallHitY = nextVertTouchY;
-// 			vertWallContent = map[(int)floor(yToCheck / TILE_SIZE)][(int)floor(xToCheck / TILE_SIZE)];
-// 			foundVertWallHit = TRUE;
-// 			break;
-// 		} else {
-// 			nextVertTouchX += xstep;
-// 			nextVertTouchY += ystep;
-// 		}
-// 	}
-
-// 	// Calculate both horizontal and vertical hit distances and choose the smallest one
-// 	float horzHitDistance = foundHorzWallHit
-// 		? distanceBetweenPoints(player.x, player.y, horzWallHitX, horzWallHitY)
-// 		: FLT_MAX;
-// 	float vertHitDistance = foundVertWallHit
-// 		? distanceBetweenPoints(player.x, player.y, vertWallHitX, vertWallHitY)
-// 		: FLT_MAX;
-
-// 	if (vertHitDistance < horzHitDistance) {
-// 		rays[stripId].distance = vertHitDistance;
-// 		rays[stripId].wallHitX = vertWallHitX;
-// 		rays[stripId].wallHitY = vertWallHitY;
-// 		rays[stripId].wallHitContent = vertWallContent;
-// 		rays[stripId].wasHitVertical = TRUE;
-// 	} else {
-// 		rays[stripId].distance = horzHitDistance;
-// 		rays[stripId].wallHitX = horzWallHitX;
-// 		rays[stripId].wallHitY = horzWallHitY;
-// 		rays[stripId].wallHitContent = horzWallContent;
-// 		rays[stripId].wasHitVertical = FALSE;
-// 	}
-// 	rays[stripId].rayAngle = rayAngle;
-// 	rays[stripId].isRayFacingDown = isRayFacingDown;
-// 	rays[stripId].isRayFacingUp = isRayFacingUp;
-// 	rays[stripId].isRayFacingLeft = isRayFacingLeft;
-// 	rays[stripId].isRayFacingRight = isRayFacingRight;
-// }
