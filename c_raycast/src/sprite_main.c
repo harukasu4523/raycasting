@@ -40,11 +40,11 @@ const int map[MAP_NUM_ROWS][MAP_NUM_COLS] = {
     {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 1},
     {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
     {1, 0, 0, 0, 2, 2, 0, 4, 0, 4, 0, 2, 0, 1, 0, 0, 0, 0, 0, 1},
-    {1, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 1},
-    {1, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 1},
-    {1, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 1},
+    {1, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+    {1, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 1},
     {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2},
-    {1, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 1, 0, 0, 0, 0, 0, 0, 2},
+    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 2},
     {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 3, 3, 0, 0, 2},
     {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 2},
     {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 2, 2, 2, 2, 2, 2}
@@ -75,24 +75,17 @@ typedef struct s_ray{
 	int wall_hit_content;
 }				t_ray[NUM_RAYS];
 
-typedef struct s_tmp{
-	float horzx;
-	float horzy;
-	float vertx;
-	float verty;
-	bool hit_horzsprite;
-	bool hit_vertsprite;
-}			t_tmp;
+
 
 typedef struct	s_sprite{
 	float x;
 	float y;
 	float distance;
 	float angle;
-	int texture;
-	bool side;
-	bool hit;
-}				t_sprite[NUM_RAYS];
+	int texture; // tex_num
+	bool visible;
+	// bool hit;
+}				t_sprite;
 
 
 
@@ -328,55 +321,10 @@ float distanceBetweenPoints(float x1, float y1, float x2, float y2) {
     return sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
 }
 
-int get_spriteData(t_tmp *tmp, float x, float y, int horz)
-{
-	// tmp.hit_horzsprite = false;
-	// tmp.hit_vertsprite = false;
-	if(horz){
-		printf("check1\n");
-		tmp->horzx = x;
-		tmp->horzy = y;
-		tmp->hit_horzsprite = true;
-	}else{
-		printf("check2\n");
-		tmp->vertx = x;
-		tmp->verty = y;
-		tmp->hit_vertsprite = true;
-	}
-	return (1);
-}
-
-void calc_spriteDistance(t_value *info, t_tmp tmp, int i, float angle)
-{
-	// printf("check2\n");
-	float horz_distance;
-	float vert_distance;
-
-	// printf("%d, %d\n",tmp.hit_horzsprite,tmp.hit_vertsprite);
-	horz_distance = tmp.hit_horzsprite ? distanceBetweenPoints(info->p.x, info->p.y, tmp.horzx, tmp.horzy) : FLT_MAX;
-	vert_distance = tmp.hit_vertsprite ? distanceBetweenPoints(info->p.x, info->p.y, tmp.vertx, tmp.verty) : FLT_MAX;
-
-	if (horz_distance < vert_distance)
-	{
-		info->spr[i].distance = horz_distance;
-		info->spr[i].x = tmp.horzx;
-		info->spr[i].y = tmp.horzy;
-		info->spr[i].side = false;
-	}else
-	{
-		info->spr[i].distance = vert_distance;
-		info->spr[i].x = tmp.vertx;
-		info->spr[i].y = tmp.verty;
-		info->spr[i].side = true;	
-	}
-	info->spr[i].hit = true;
-	info->spr[i].angle = angle;
-
-}
 
 void cast_ray(float ray_angle, int strip_id, t_value *info)
 {
-	t_tmp tmp;
+	// t_tmp tmp;
 	ray_angle = normalize_angle(ray_angle);
 
 	int face_down = ray_angle > 0 && ray_angle < M_PI;
@@ -421,8 +369,6 @@ void cast_ray(float ray_angle, int strip_id, t_value *info)
 		float x_to_check = next_horz_touch_x;
 		float y_to_check = next_horz_touch_y + (face_up ? -1 : 0);
 
-		if (map[(int)(y_to_check / TILE_SIZE)][(int)(x_to_check / TILE_SIZE)] == 5)
-			sprite = get_spriteData(&tmp, next_horz_touch_x, next_horz_touch_y, 1);
 		if (map_has_wall_at(x_to_check, y_to_check)) {
 			horz_wall_hit_x = next_horz_touch_x;
 			horz_wall_hit_y = next_horz_touch_y;
@@ -467,8 +413,7 @@ void cast_ray(float ray_angle, int strip_id, t_value *info)
 	while (next_vert_touch_x >= 0 && next_vert_touch_x <= WINDOW_WIDTH && next_vert_touch_y >= 0 && next_vert_touch_y <= WINDOW_HEIGHT) {
 		float x_to_check = next_vert_touch_x + (face_left ? -1 : 0);
 		float y_to_check = next_vert_touch_y;
-		if (map[(int)(y_to_check / TILE_SIZE)][(int)(x_to_check / TILE_SIZE)] == 5)
-			sprite = get_spriteData(&tmp, next_horz_touch_x, next_horz_touch_y, 0);
+
 		if (map_has_wall_at(x_to_check, y_to_check)) {
 
 			vert_wall_hit_x = next_vert_touch_x;
@@ -488,9 +433,7 @@ void cast_ray(float ray_angle, int strip_id, t_value *info)
     float vert_hit_distance = found_vert_wall_hit
         ? distanceBetweenPoints(info->p.x, info->p.y, vert_wall_hit_x, vert_wall_hit_y)
         : FLT_MAX;
-	// info->spr[strip_id].hit = false;
-	if (sprite)
-		calc_spriteDistance(info, tmp, strip_id, ray_angle);
+
 
     if (vert_hit_distance < horz_hit_distance) {
         info->ray[strip_id].distance = vert_hit_distance;
@@ -549,7 +492,7 @@ void draw_square(t_value *info, int x, int y, int size, int color)
 
 }
 
-void render_map(t_value *v)
+void render_map_grid(t_value *v)
 {
 	for (int i = 0; i < MAP_NUM_ROWS; i++) {
         for (int j = 0; j < MAP_NUM_COLS; j++) {
@@ -581,7 +524,7 @@ void draw_line(t_value *info, float x0, float y0, float x1, float y1, int color)
 	}
 }
 
-void render_rays(t_value *info)
+void render_map_rays(t_value *info)
 {
 	int color = 0xFF0000;
 	for (int i = 0; i < NUM_RAYS; i++)
@@ -591,74 +534,68 @@ void render_rays(t_value *info)
 }
 
 
-void render_player(t_value *info)
+void render_map_player(t_value *info)
 {
 	float x = info->p.x * MINIMAP_SCALE_FACTOR, y = info->p.y * MINIMAP_SCALE_FACTOR;
 	draw_square(info, (int)y, (int)x, 1, 0xFFFFFF);
 	draw_line(info, x, y, x + 40 * cos(info->p.rotation_angle), y + 40 * sin(info->p.rotation_angle), 0x0000FF);
 }
 
-void render_texture(t_value *info,int i, int tex_num)
+int decide_texture(t_value *info, int i)
 {
-	printf("%lf\n",info->spr[i].distance);
-	if ((int)info->spr[i].distance < 60)
-		info->spr[i].distance = 60;
-	float prep_distance = info->spr[i].distance * cos(info->spr[i].angle - info->p.rotation_angle);
-	float distance_proj_plane = (WINDOW_WIDTH / 2) / tan(FOV_ANGLE / 2);
-	float projected_wall_height = (TILE_SIZE / prep_distance) * distance_proj_plane;
-
-	int wall_strip_height = (int)projected_wall_height;
-	int wall_top_pixel = (WINDOW_HEIGHT / 2) - (wall_strip_height / 2);
-	wall_top_pixel = wall_top_pixel < 0 ? 0 : wall_top_pixel;
-
-	int wall_bottom_pixel = (WINDOW_HEIGHT / 2) + (wall_strip_height / 2);
-	wall_bottom_pixel = wall_bottom_pixel > WINDOW_HEIGHT ? WINDOW_HEIGHT : wall_bottom_pixel;
-
-	int texture_offset_x;
-	printf("%d\n",info->spr[i].side);
-	if (info->spr[i].side)
+	if(info->ray[i].face_up && !info->ray[i].was_hit_vertical)
 	{
-		//perform offset for the vertical
-		texture_offset_x = (int)info->spr[i].y % TILE_SIZE;
-	}else{
-		texture_offset_x = (int)info->spr[i].x % TILE_SIZE;
-	}
-	for (int y = wall_top_pixel ; y < wall_bottom_pixel; y++)
+		return 0;
+	}else if(info->ray[i].face_up && info->ray[i].was_hit_vertical)
 	{
-		//TODO calculate texture offset_y
-		int distance_from_top = y + (wall_strip_height / 2) - (WINDOW_HEIGHT / 2);
-		int texture_offset_y = distance_from_top * ((float)TEX_HEIGHT / wall_strip_height);
-		//set the color of the wall based on the color from the texture
-		uint32_t texture_color = info->texture[tex_num][texture_offset_y * info->tex_width[tex_num] + texture_offset_x];
-		if (!texture_color)
-			continue;
-		// printf("aaaa%d\n",texture_color);
-		info->img.data[(WINDOW_WIDTH * y) + i] = texture_color;
+		if(info->p.x > info->ray[i].wall_hit_x)
+			return 1;
+		else
+			return 2;
+	}else if (info->ray[i].face_down && !info->ray[i].was_hit_vertical)
+	{
+		return 3;
+	}else if(info->ray[i].face_down && info->ray[i].was_hit_vertical)
+	{
+		if(info->p.x < info->ray[i].wall_hit_x)
+			return 2;
+		else
+			return 1;
 	}
+	return -1;
 }
-
 
 void generate3d_projection(t_value *info)
 {
 	for(int i = 0; i < NUM_RAYS; i++)
 	{
+		//Calculate the perpendicular distance to avoid the fish-eye distortion
 		float prep_distance = info->ray[i].distance * cos(info->ray[i].ray_angle - info->p.rotation_angle);
 		float distance_proj_plane = (WINDOW_WIDTH / 2) / tan(FOV_ANGLE / 2);
-		float projected_wall_height = (TILE_SIZE / prep_distance) * distance_proj_plane;
 
-		int wall_strip_height = (int)projected_wall_height;
-		int wall_top_pixel = (WINDOW_HEIGHT / 2) - (wall_strip_height / 2);
-		wall_top_pixel = wall_top_pixel < 0 ? 0 : wall_top_pixel;
-
-		int wall_bottom_pixel = (WINDOW_HEIGHT / 2) + (wall_strip_height / 2);
-		wall_bottom_pixel = wall_bottom_pixel > WINDOW_HEIGHT ? WINDOW_HEIGHT : wall_bottom_pixel;
+		//Calculate the projected wall heigh
+		int wall_height = (TILE_SIZE / prep_distance) * distance_proj_plane;
+		//Find the wall top Y value
+		int wall_top_y = (WINDOW_HEIGHT / 2) - (wall_height / 2);
+		wall_top_y = wall_top_y < 0 ? 0 : wall_top_y;
+		// Find the wall bottom Y value
+		int wall_bottom_y = (WINDOW_HEIGHT / 2) + (wall_height / 2);
+		wall_bottom_y = wall_bottom_y > WINDOW_HEIGHT ? WINDOW_HEIGHT : wall_bottom_y;
 
 		int texture_offset_x;
-		// set the color of the ceiling
-		for (int y = 0; y < wall_top_pixel; y++)
+		// Draw the ceiling
+		for (int y = 0; y < wall_top_y; y++)
 		{
 			info->img.data[(WINDOW_WIDTH * y) + i] = 0x333333;
 		}
+		int tex_num = decide_texture(info, i);
+		if (tex_num < 0)
+			exit(0);
+		// printf("check%d\n",info->spr[i].hit);
+		// if (info->spr[i].hit){
+		// 	tex_num = 4;
+		// }
+
 		//TODO calculate texture offset_x
 		if (info->ray[i].was_hit_vertical)
 		{
@@ -669,38 +606,14 @@ void generate3d_projection(t_value *info)
 			//perform offser for the horizontal
 			texture_offset_x = (int)info->ray[i].wall_hit_x % TILE_SIZE;
 		}
-		int tex_num; //= info->ray[i].wall_hit_content - 1;
-		// printf("check%d\n",info->spr[i].hit);
-		// if (info->spr[i].hit){
-		// 	tex_num = 4;
-		// }
-		if(info->ray[i].face_up && !info->ray[i].was_hit_vertical)
-		{
-			tex_num = 0;
-		}else if(info->ray[i].face_up && info->ray[i].was_hit_vertical)
-		{
-			if(info->p.x > info->ray[i].wall_hit_x)
-				tex_num = 1;
-			else
-				tex_num = 2;
-		}else if (info->ray[i].face_down && !info->ray[i].was_hit_vertical)
-		{
-			tex_num = 3;
-		}else if(info->ray[i].face_down && info->ray[i].was_hit_vertical)
-		{
-			if(info->p.x < info->ray[i].wall_hit_x)
-				tex_num = 2;
-			else
-				tex_num = 1;
-		}
 		// printf("%d\n",tex_num);
 		// if (tex_num != 4)
 		// {
-		for (int y = wall_top_pixel ; y < wall_bottom_pixel; y++)
+		for (int y = wall_top_y ; y < wall_bottom_y; y++)
 		{
 			//TODO calculate texture offset_y
-			int distance_from_top = y + (wall_strip_height / 2) - (WINDOW_HEIGHT / 2);
-			int texture_offset_y = distance_from_top * ((float)TEX_HEIGHT / wall_strip_height);
+			int distance_from_top = y + (wall_height / 2) - (WINDOW_HEIGHT / 2);
+			int texture_offset_y = distance_from_top * ((float)TEX_HEIGHT / wall_height);
 			//set the color of the wall based on the color from the texture
 			uint32_t texture_color = info->texture[tex_num][texture_offset_y * info->tex_width[tex_num] + texture_offset_x];
 			// if (texture_color == 0)
@@ -711,27 +624,161 @@ void generate3d_projection(t_value *info)
 		// printf("check%d\n",info->spr[i].hit);
 		// int a = info->spr[i].hit;
 		//set the color of the floor
-		for (int y = wall_bottom_pixel; y < WINDOW_HEIGHT ; y++)
+		for (int y = wall_bottom_y; y < WINDOW_HEIGHT ; y++)
 		{
 			info->img.data[(WINDOW_WIDTH * y) + i] = 0x777777;
 		}
-		if (info->spr[i].hit)
-			render_texture(info, i, 4);
+		// if (info->spr[i].hit)
+		// 	render_texture(info, i, 4);
 	}
 
 }
 
+
+void draw_rect(t_value *info ,int x, int y, int width, int height, int color) {
+    for (int i = x; i <= (x + width); i++) {
+        for (int j = y; j <= (y + height); j++) {
+            draw_pixel(&info->img , i, j, color);
+        }
+    }
+}
+
+#define NUM_SPRITES 6
+
+static t_sprite sprites[NUM_SPRITES] = {
+    { .x = 640, .y = 630, .texture =  9 }, // barrel 
+    { .x = 660, .y = 690, .texture =  9 }, // barrel 
+    { .x = 250, .y = 600, .texture = 11 }, // table 
+    { .x = 250, .y = 600, .texture = 10 }, // light 
+    { .x = 300, .y = 400, .texture = 12 }, // guard
+    { .x =  90, .y = 100, .texture = 13 }  // armor
+};
+
+void render_map_sprites(t_value *info)
+{
+	for(int i = 0 ; i < NUM_SPRITES ; i++)
+	{
+		draw_rect(info, sprites[i].x * MINIMAP_SCALE_FACTOR, sprites[i].y * MINIMAP_SCALE_FACTOR, 2, 2,(sprites[i].visible) ?  0x00FFFF : 0x444444);
+	}
+
+}
+
+void render_sprite_projection(t_value *info)
+{
+	t_sprite visible_sprites[NUM_SPRITES];
+	int num_visible_sprites = 0;
+
+	// Find sprites that are visible (inside the FOV)
+	for (int i = 0; i < NUM_SPRITES; i++)
+	{
+		float angle_sprite_player = info->p.rotation_angle - atan2(sprites[i].y - info->p.y, sprites[i].x - info->p.x);
+		// Make sure the angle is always between  0 and 180 degrees
+		if (angle_sprite_player > M_PI)
+			angle_sprite_player -= (2.0 * M_PI);
+		if (angle_sprite_player < -M_PI)
+			angle_sprite_player += (2.0 * M_PI);
+		angle_sprite_player = fabs(angle_sprite_player);
+
+		//if sprite angle is less than half the FOV plus a small error margin
+		const float EPSILON = 0.2;
+		if (angle_sprite_player <= (FOV_ANGLE / 2) + EPSILON)
+		{
+			sprites[i].visible = true;
+			sprites[i].angle = angle_sprite_player;
+			sprites[i].distance = distanceBetweenPoints(sprites[i].x, sprites[i].y, info->p.x, info->p.y);
+			visible_sprites[num_visible_sprites] = sprites[i];
+			num_visible_sprites++;
+		}else
+		{
+			sprites[i].visible = false;
+		}
+	}
+
+	// Sort sprites by distance using a naibe buble-sort algorithm
+    for (int i = 0; i < num_visible_sprites - 1; i++) {
+        for (int j = i + 1; j < num_visible_sprites; j++) {
+            if (visible_sprites[i].distance < visible_sprites[j].distance) {
+                t_sprite temp = visible_sprites[i];
+                visible_sprites[i] = visible_sprites[j];
+                visible_sprites[j] = temp;
+            }
+        }
+    }
+	// Rendering all the visible sprites
+	for(int i = 0; i < num_visible_sprites; i++)
+	{
+		t_sprite sprite = visible_sprites[i];
+
+		// Calculate the perpendicular distance of the sprite to prevent fish-eye effect
+		float prep_distance = sprite.distance * cos(sprite.angle);
+		float distance_proj_plane = (WINDOW_WIDTH / 2) / tan(FOV_ANGLE / 2);
+
+		// Calculate the sprite projected height and width (the same, as sprites are squared)
+		float sprite_height = (TILE_SIZE / sprite.distance) * distance_proj_plane;
+		float sprite_width = sprite_height;
+		
+		// Sprite top Y
+		float sprite_top_y = (WINDOW_HEIGHT / 2) - (sprite_height / 2);
+		sprite_top_y = (sprite_top_y < 0) ? 0 : sprite_top_y;
+
+		// Sprite bottom Y
+		float sprite_bottom_y = (WINDOW_HEIGHT / 2) + (sprite_height / 2);
+		sprite_bottom_y = (sprite_bottom_y > WINDOW_HEIGHT) ? WINDOW_HEIGHT : sprite_bottom_y;
+
+		// Calculate the sprite X position in the projection plane 
+		float sprite_angle = atan2(sprite.y - info->p.y, sprite.x - info->p.x) - info->p.rotation_angle;
+		float sprite_screen_posx = tan(sprite_angle) * distance_proj_plane;
+
+		// Sprite left x
+		float sprite_left_x = (WINDOW_WIDTH / 2) + sprite_screen_posx - (sprite_width  / 2);
+
+		//sprite right x
+		float sprite_right_x = sprite_left_x + sprite_width;
+
+		// Query the width and height of the texture
+		int texture_width = 64;
+		int texture_heigh = 64;
+
+		// Loop all the x value 
+		for(int x = sprite_left_x; x < sprite_right_x; x++)
+		{
+			float texel_width = (texture_width / sprite_width);
+			int texture_offset_x = (x - sprite_left_x) * texel_width;
+
+			// Loop at the y value
+			for(int y = sprite_top_y; y < sprite_bottom_y; y++)
+			{
+				if (x > 0 && x < WINDOW_WIDTH && y > 0 && y < WINDOW_HEIGHT)
+				{
+					int distance_from_top = y + (sprite_height / 2) - (WINDOW_HEIGHT / 2);
+					int texture_offset_y = distance_from_top * (texture_heigh / sprite_height);
+
+					uint32_t texture_color = info->texture[4][texture_offset_y * info->tex_width[4] + texture_offset_x];
+					if (sprite.distance > info->ray[x].distance || !texture_color)
+						continue;
+					draw_pixel(&info->img, x, y, texture_color);
+				}
+			}
+		}
+	} 
+
+}
+
+
 int render(t_value *info){
 	clear_map(info);//draw window black
 	update(info);
-	//Render the wall and sprite
+	//Render the walls and sprite
 	generate3d_projection(info);
+	render_sprite_projection(info);
+
 	//renderSpriteProjection
 
 	//display  the minimap
-	render_map(info);
-	render_rays(info);
-	render_player(info);
+	render_map_grid(info);
+	render_map_rays(info);
+	render_map_sprites(info);
+	render_map_player(info);
 
 	// draw_square(info);
 	mlx_put_image_to_window(info->mlx, info->win, info->img.img, 0, 0);//putimage
@@ -768,7 +815,7 @@ void texture_in(t_value *info,char *path,int tex_num, t_img *img)
 	}
 }
 
-void load_texture(t_value *info, t_img *img)
+void load_textures(t_value *info, t_img *img)
 {
 	texture_in(info, "./textures/eagle.xpm", 0, img);
 	texture_in(info, "./textures/mossy.xpm", 1, img);
@@ -777,11 +824,12 @@ void load_texture(t_value *info, t_img *img)
 	texture_in(info, "./textures/barrel.xpm", 4, img);
 }
 
+
 int main (int argc, char **argv){
     t_value  info;
 	t_img img;
     info.mlx = mlx_init();
-	load_texture(&info,&img);
+	load_textures(&info,&img);
     if(!initializeWindow(&info))
 		exit(0);
 	setup(&info);
